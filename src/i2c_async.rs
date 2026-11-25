@@ -1,15 +1,28 @@
 //! [`embedded-hal-async`] helper functions for I²C communication.
 //!
-//! These functions are identical to the helpers in the [`i2c`](crate::i2c)
-//! module, except that they use the async I²C traits from [`embedded-hal-async`]
-//! rther than the blocking I²C traits from `embedded-hal`.
+//! These are the async equivalents of the helpers in [`i2c`](crate::i2c).
+//! They use the I²C traits from [`embedded-hal-async`].
 //!
 //! [`embedded-hal-async`]: https://crates.io/crates/embedded-hal-async
 
 use crate::crc8;
 use embedded_hal_async::i2c;
 
-pub use crate::i2c::Error;
+/// I²C or CRC error for an async bus.
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum Error<I: i2c::ErrorType> {
+    I2cWrite(I::Error),
+    I2cRead(I::Error),
+    Crc,
+}
+
+impl<I: i2c::ErrorType> From<crc8::Error> for Error<I> {
+    fn from(err: crc8::Error) -> Self {
+        match err {
+            crc8::Error::CrcError => Self::Crc,
+        }
+    }
+}
 
 /// Write an u8 command to the I²C bus.
 pub async fn write_command_u8<I: i2c::I2c>(

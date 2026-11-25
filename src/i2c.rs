@@ -1,18 +1,18 @@
 //! Helper functions for I²C communication.
 
 use crate::crc8;
-use embedded_hal::i2c;
+use embedded_hal::blocking::i2c::{Read, Write};
 
 /// All possible errors in this crate
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub enum Error<I: i2c::ErrorType> {
-    I2cWrite(I::Error),
-    I2cRead(I::Error),
+pub enum Error<E> {
+    I2cWrite(E),
+    I2cRead(E),
     Crc,
 }
 
-impl<I: i2c::ErrorType> From<crc8::Error> for Error<I> {
-    fn from(err: crc8::Error) -> Error<I> {
+impl<E> From<crc8::Error> for Error<E> {
+    fn from(err: crc8::Error) -> Self {
         match err {
             crc8::Error::CrcError => Error::Crc,
         }
@@ -21,17 +21,17 @@ impl<I: i2c::ErrorType> From<crc8::Error> for Error<I> {
 
 /// Write an u16 command to the I²C bus.
 #[deprecated(note = "Please use `write_command_u16` instead.")]
-pub fn write_command<I: i2c::I2c>(i2c: &mut I, addr: u8, command: u16) -> Result<(), I::Error> {
+pub fn write_command<I: Write>(i2c: &mut I, addr: u8, command: u16) -> Result<(), I::Error> {
     write_command_u16(i2c, addr, command)
 }
 
 /// Write an u8 command to the I²C bus.
-pub fn write_command_u8<I: i2c::I2c>(i2c: &mut I, addr: u8, command: u8) -> Result<(), I::Error> {
+pub fn write_command_u8<I: Write>(i2c: &mut I, addr: u8, command: u8) -> Result<(), I::Error> {
     i2c.write(addr, &command.to_be_bytes())
 }
 
 /// Write an u16 command to the I²C bus.
-pub fn write_command_u16<I: i2c::I2c>(i2c: &mut I, addr: u8, command: u16) -> Result<(), I::Error> {
+pub fn write_command_u16<I: Write>(i2c: &mut I, addr: u8, command: u16) -> Result<(), I::Error> {
     i2c.write(addr, &command.to_be_bytes())
 }
 
@@ -43,11 +43,11 @@ pub fn write_command_u16<I: i2c::I2c>(i2c: &mut I, addr: u8, command: u16) -> Re
 ///
 /// This method will consider every third byte a checksum byte. If the buffer size is not a
 /// multiple of 3, then it will panic.
-pub fn read_words_with_crc<I: i2c::I2c>(
+pub fn read_words_with_crc<I: Read>(
     i2c: &mut I,
     addr: u8,
     data: &mut [u8],
-) -> Result<(), Error<I>> {
+) -> Result<(), Error<I::Error>> {
     assert!(
         data.len() % 3 == 0,
         "Buffer must hold a multiple of 3 bytes"
@@ -61,8 +61,7 @@ pub fn read_words_with_crc<I: i2c::I2c>(
 mod tests {
     use crate::i2c;
 
-    use embedded_hal_mock as hal;
-    use hal::eh1::i2c::{Mock as I2cMock, Transaction};
+    use embedded_hal_mock::eh0::i2c::{Mock as I2cMock, Transaction};
 
     #[test]
     fn read_words_with_crc() {
